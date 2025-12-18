@@ -156,8 +156,4 @@ public class EditNoteActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onBackPressed() {
-        handleBackPressed();
-    }
 }
