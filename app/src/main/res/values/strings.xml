@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">NewProject</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_delete">Удалить</string>
+    <string name="menu_edit">Редактировать</string>
+    <string name="menu_delete">Удалить</string>
+    <string name="menu_pin">Закрепить</string>
+    <string name="menu_share">Поделиться</string>
+    <string name="fab_add_note">Добавить заметку</string>
+    <string name="quick_note_title">Быстрая заметка</string>
+    <string name="empty_title">Без названия</string>
+    <string name="note_saved">Заметка сохранена</string>
+    <string name="note_deleted">Заметка удалена</string>
+    <string name="note_pinned">Заметка закреплена</string>
+    <string name="note_unpinned">Заметка откреплена</string>
 </resources>

@@ -19,9 +19,11 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        android:src="@android:drawable/ic_input_add"
-        android:contentDescription="Add note"
+        android:src="@drawable/ic_fab_add_note"
+        android:contentDescription="Добавить заметку"
         app:tint="@android:color/white"
-        app:backgroundTint="#2196F3" />
+        app:backgroundTint="#2196F3"
+        app:elevation="8dp"
+        app:rippleColor="#1976D2" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
