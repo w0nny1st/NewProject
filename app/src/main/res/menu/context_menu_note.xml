@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/menu_edit"
+        android:title="Редактировать"
+        android:icon="@android:drawable/ic_menu_edit" />
+
+    <item
+        android:id="@+id/menu_delete"
+        android:title="Удалить"
+        android:icon="@android:drawable/ic_menu_delete" />
+
+    <item
+        android:id="@+id/menu_pin"
+        android:title="Закрепить/Открепить"
+        android:icon="@android:drawable/ic_menu_upload" />
+
+    <item
+        android:id="@+id/menu_share"
+        android:title="Поделиться"
+        android:icon="@android:drawable/ic_menu_share" />
+
+</menu>

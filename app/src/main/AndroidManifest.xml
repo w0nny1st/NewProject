@@ -17,6 +17,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".EditNoteActivity"
+            android:exported="false"
+            android:theme="@style/Theme.NewProject.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>

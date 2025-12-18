@@ -1,6 +1,11 @@
 package com.example.newproject;
 
-public class Note {
+import java.io.Serializable;
+import android.os.Parcel;
+import android.os.Parcelable;
+
+
+public class Note implements Serializable {
     private String id;
     private String title;
     private String content;
@@ -17,8 +22,8 @@ public class Note {
         this.color = 0;
     }
 
-    // Getters and setters
     public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
