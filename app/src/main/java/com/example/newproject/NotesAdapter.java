@@ -21,6 +21,7 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
     public interface OnNoteClickListener {
         void onNoteClick(int position);
         void onNoteLongClick(int position);
+        void onNoteSwiped(int position);
     }
 
     public NotesAdapter(OnNoteClickListener listener) {
@@ -31,6 +32,12 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
     public void setNotes(List<Note> notes) {
         this.notes = notes != null ? notes : new ArrayList<>();
         notifyDataSetChanged();
+    }
+
+    public void onItemSwiped(int position) {
+        if (listener != null) {
+            listener.onNoteSwiped(position);
+        }
     }
 
     public List<Note> getNotes() {

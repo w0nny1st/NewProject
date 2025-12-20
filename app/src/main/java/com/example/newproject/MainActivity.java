@@ -3,6 +3,10 @@ package com.example.newproject;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
@@ -19,6 +23,7 @@ import androidx.core.content.ContextCompat;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -51,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
 
         initViews();
         setupRecyclerView();
+        setupItemTouchHelper();
         setupObservers();
         checkNotificationPermission();
     }
@@ -88,9 +94,10 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         fab.setOnClickListener(v -> {
             v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
                     .withEndAction(() -> {
-                        v.animate().scaleX(1f).scaleY(1f).setDuration(100);
-                        openEditNoteActivity(null);
-                    });
+                        v.animate().scaleX(1f).scaleY(1f).setDuration(100)
+                                .withEndAction(() -> openEditNoteActivity(null))
+                                .start();
+                    }).start();
         });
     }
 
@@ -107,11 +114,100 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         recyclerView.addItemDecoration(dividerItemDecoration);
     }
 
+    private void setupItemTouchHelper() {
+        ItemTouchHelper.SimpleCallback simpleItemTouchCallback = new ItemTouchHelper.SimpleCallback(
+                0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                showDeleteConfirmation(position);
+            }
+
+            @Override
+            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView,
+                                    @NonNull RecyclerView.ViewHolder viewHolder,
+                                    float dX, float dY, int actionState, boolean isCurrentlyActive) {
+
+                View itemView = viewHolder.itemView;
+                Paint paint = new Paint();
+
+                if (dX > 0) {
+                    paint.setColor(Color.parseColor("#FF3B30"));
+                    c.drawRect((float) itemView.getLeft(), (float) itemView.getTop(),
+                            dX, (float) itemView.getBottom(), paint);
+
+                    Drawable icon = ContextCompat.getDrawable(MainActivity.this, android.R.drawable.ic_delete);
+                    if (icon != null) {
+                        int iconMargin = (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+                        int iconTop = itemView.getTop() + (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+                        int iconBottom = iconTop + icon.getIntrinsicHeight();
+                        int iconLeft = itemView.getLeft() + iconMargin;
+                        int iconRight = iconLeft + icon.getIntrinsicWidth();
+                        icon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+                        icon.draw(c);
+                    }
+                } else {
+                    paint.setColor(Color.parseColor("#FF9500"));
+                    c.drawRect((float) itemView.getRight() + dX, (float) itemView.getTop(),
+                            (float) itemView.getRight(), (float) itemView.getBottom(), paint);
+
+                    Drawable icon = ContextCompat.getDrawable(MainActivity.this, android.R.drawable.ic_menu_share);
+                    if (icon != null) {
+                        int iconMargin = (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+                        int iconTop = itemView.getTop() + (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+                        int iconBottom = iconTop + icon.getIntrinsicHeight();
+                        int iconRight = itemView.getRight() - iconMargin;
+                        int iconLeft = iconRight - icon.getIntrinsicWidth();
+                        icon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+                        icon.draw(c);
+                    }
+                }
+
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+            }
+
+            @Override
+            public float getSwipeThreshold(@NonNull RecyclerView.ViewHolder viewHolder) {
+                return 0.5f;
+            }
+
+            @Override
+            public float getSwipeEscapeVelocity(float defaultValue) {
+                return defaultValue * 2;
+            }
+        };
+
+        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(simpleItemTouchCallback);
+        itemTouchHelper.attachToRecyclerView(recyclerView);
+    }
+
     private void setupObservers() {
         noteViewModel.getFilteredNotes().observe(this, new Observer<List<Note>>() {
             @Override
             public void onChanged(List<Note> notes) {
                 adapter.setNotes(notes);
+
+                if (recyclerView.getAdapter().getItemCount() > 0) {
+                    for (int i = 0; i < recyclerView.getChildCount(); i++) {
+                        View child = recyclerView.getChildAt(i);
+                        child.setAlpha(0f);
+                        child.setTranslationY(50);
+                        child.animate()
+                                .alpha(1f)
+                                .translationY(0)
+                                .setDuration(300)
+                                .setStartDelay(i * 50)
+                                .start();
+                    }
+                }
             }
         });
 
@@ -279,13 +375,33 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
             intent.putExtra("note", note);
         }
         startActivityForResult(intent, REQUEST_EDIT_NOTE);
+
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
     }
 
     @Override
     public void onNoteClick(int position) {
         List<Note> notes = adapter.getNotes();
         if (notes != null && position >= 0 && position < notes.size()) {
-            openEditNoteActivity(notes.get(position));
+
+            View itemView = recyclerView.getLayoutManager().findViewByPosition(position);
+            if (itemView != null) {
+                itemView.animate()
+                        .scaleX(0.95f)
+                        .scaleY(0.95f)
+                        .setDuration(100)
+                        .withEndAction(() -> {
+                            itemView.animate()
+                                    .scaleX(1f)
+                                    .scaleY(1f)
+                                    .setDuration(100)
+                                    .withEndAction(() -> openEditNoteActivity(notes.get(position)))
+                                    .start();
+                        })
+                        .start();
+            } else {
+                openEditNoteActivity(notes.get(position));
+            }
         }
     }
 
@@ -294,6 +410,19 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         List<Note> notes = adapter.getNotes();
         if (notes != null && position >= 0 && position < notes.size()) {
             Note note = notes.get(position);
+
+            View itemView = recyclerView.getLayoutManager().findViewByPosition(position);
+            if (itemView != null) {
+                itemView.animate()
+                        .translationY(-20)
+                        .setDuration(200)
+                        .withEndAction(() -> itemView.animate()
+                                .translationY(0)
+                                .setDuration(200)
+                                .start())
+                        .start();
+            }
+
             note.setPinned(!note.isPinned());
             noteViewModel.update(note);
 
@@ -310,6 +439,79 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
     }
 
     @Override
+    public void onNoteSwiped(int position) {
+        showDeleteConfirmation(position);
+    }
+
+    private void showDeleteConfirmation(int position) {
+        List<Note> notes = adapter.getNotes();
+        if (notes == null || position < 0 || position >= notes.size()) {
+            adapter.notifyDataSetChanged();
+            return;
+        }
+
+        Note noteToDelete = notes.get(position);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Удалить заметку")
+                .setMessage("Удалить заметку \"" + noteToDelete.getTitle() + "\"?")
+                .setPositiveButton("Удалить", (dialog, which) -> {
+
+                    animateNoteRemoval(position, noteToDelete);
+                })
+                .setNegativeButton("Отмена", (dialog, which) -> {
+
+                    adapter.notifyItemChanged(position);
+                })
+                .setOnCancelListener(dialog -> {
+
+                    adapter.notifyItemChanged(position);
+                })
+                .show();
+    }
+
+    private void animateNoteRemoval(int position, Note note) {
+        View itemView = recyclerView.getLayoutManager().findViewByPosition(position);
+
+        if (itemView != null) {
+
+            itemView.animate()
+                    .scaleX(0.8f)
+                    .scaleY(0.8f)
+                    .alpha(0.5f)
+                    .setDuration(300)
+                    .withEndAction(() -> {
+
+                        noteViewModel.delete(note);
+
+                        Toast.makeText(this, "Заметка удалена", Toast.LENGTH_SHORT).show();
+
+                        fab.animate()
+                                .rotationBy(360)
+                                .setDuration(500)
+                                .start();
+
+                        if (notificationHelper.areNotificationsEnabled()) {
+                            notificationHelper.showSimpleNotification(
+                                    "Заметка удалена",
+                                    "Заметка \"" + note.getTitle() + "\" удалена"
+                            );
+                        }
+                    })
+                    .start();
+        } else {
+
+            noteViewModel.delete(note);
+            Toast.makeText(this, "Заметка удалена", Toast.LENGTH_SHORT).show();
+
+            fab.animate()
+                    .rotationBy(360)
+                    .setDuration(500)
+                    .start();
+        }
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -320,6 +522,7 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 Note deletedNote = (Note) data.getSerializableExtra("note");
                 if (deletedNote != null) {
                     noteViewModel.delete(deletedNote);
+                    showDeleteAnimation(); // Анимация удаления
                     Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show();
 
                     if (notificationHelper.areNotificationsEnabled()) {
@@ -342,6 +545,7 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 Toast.makeText(this, "Сохранено", Toast.LENGTH_SHORT).show();
             } else {
                 noteViewModel.insert(updatedNote);
+                showAddAnimation(); // Анимация добавления
                 Toast.makeText(this, "Добавлено", Toast.LENGTH_SHORT).show();
 
                 if (notificationHelper.areNotificationsEnabled()) {
@@ -354,6 +558,26 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         }
     }
 
+    private void showAddAnimation() {
+        fab.animate()
+                .scaleX(1.5f)
+                .scaleY(1.5f)
+                .setDuration(200)
+                .withEndAction(() -> fab.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200)
+                        .start())
+                .start();
+    }
+
+    private void showDeleteAnimation() {
+        fab.animate()
+                .rotationBy(360)
+                .setDuration(500)
+                .start();
+    }
+
     private void clearAllNotes() {
         new AlertDialog.Builder(this)
                 .setTitle("Очистить все заметки")
@@ -361,6 +585,18 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 .setPositiveButton("Удалить", (dialog, which) -> {
                     noteViewModel.deleteAllNotes();
                     Toast.makeText(this, "Все заметки удалены", Toast.LENGTH_SHORT).show();
+
+                    fab.animate()
+                            .rotationBy(720)
+                            .scaleX(1.3f)
+                            .scaleY(1.3f)
+                            .setDuration(800)
+                            .withEndAction(() -> fab.animate()
+                                    .scaleX(1f)
+                                    .scaleY(1f)
+                                    .setDuration(300)
+                                    .start())
+                            .start();
 
                     if (notificationHelper.areNotificationsEnabled()) {
                         notificationHelper.showSimpleNotification(
@@ -373,4 +609,9 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 .show();
     }
 
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right);
+    }
 }
