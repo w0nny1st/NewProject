@@ -1,8 +1,10 @@
 package com.example.newproject;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
@@ -39,22 +41,29 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
     public void onBindViewHolder(@NonNull NoteViewHolder holder, int position) {
         Note note = notes.get(position);
 
-        // Apply decorators
-        NoteDecorator decorator = getNoteDecorator(note);
+        holder.titleTextView.setText(note.getTitle());
+        holder.contentTextView.setText(note.getContent());
 
-        String decoratedTitle = decorator.decorateTitle(note.getTitle());
-        String decoratedContent = decorator.decorateContent(note.getContent());
-        int decoratedColor = decorator.getDecoratedColor(note.getColor());
+        String date = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                .format(note.getTimestamp());
+        holder.dateTextView.setText(date);
 
-        holder.titleTextView.setText(decoratedTitle);
-        holder.contentTextView.setText(decoratedContent);
-        holder.dateTextView.setText(formatDate(note.getTimestamp()));
-        holder.typeTextView.setText(decorator.getType());
+        if (note.getColor() != 0) {
+            holder.cardView.setCardBackgroundColor(note.getColor());
+        } else {
+            holder.cardView.setCardBackgroundColor(Color.WHITE);
+        }
 
-        // Set card background color
-        holder.cardView.setCardBackgroundColor(decoratedColor);
+        if (note.isPinned()) {
+            holder.statusIcon.setImageResource(R.drawable.ic_pin);
+            holder.statusIcon.setColorFilter(holder.itemView.getContext()
+                    .getResources().getColor(R.color.accent_color));
+        } else {
+            holder.statusIcon.setImageResource(R.drawable.ic_notes);
+            holder.statusIcon.setColorFilter(holder.itemView.getContext()
+                    .getResources().getColor(R.color.primary_color));
+        }
 
-        // Click listeners
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onNoteClick(position);
         });
@@ -63,40 +72,6 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
             if (listener != null) listener.onNoteLongClick(position);
             return true;
         });
-    }
-
-    private NoteDecorator getNoteDecorator(Note note) {
-        // Priority: Pinned > Urgent > Important > Completed > Default
-        if (note.isPinned()) {
-            return new PinnedNoteDecorator();
-        }
-
-        // You can add more conditions based on note properties
-        // For demo, we'll assign decorators based on position
-        int position = notes.indexOf(note);
-        switch (position % 4) {
-            case 1: return new ImportantNoteDecorator();
-            case 2: return new UrgentNoteDecorator();
-            case 3: return new CompletedNoteDecorator();
-            default:
-                return new NoteDecorator() {
-                    @Override
-                    public String decorateTitle(String title) { return title; }
-                    @Override
-                    public String decorateContent(String content) { return content; }
-                    @Override
-                    public int getDecoratedColor(int originalColor) {
-                        return originalColor != 0 ? originalColor : 0xFFFFFFFF;
-                    }
-                    @Override
-                    public String getType() { return "STANDARD"; }
-                };
-        }
-    }
-
-    private String formatDate(long timestamp) {
-        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault());
-        return sdf.format(timestamp);
     }
 
     @Override
@@ -126,7 +101,7 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         TextView titleTextView;
         TextView contentTextView;
         TextView dateTextView;
-        TextView typeTextView;
+        ImageView statusIcon;
 
         public NoteViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -134,7 +109,7 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
             titleTextView = itemView.findViewById(R.id.title_text_view);
             contentTextView = itemView.findViewById(R.id.content_text_view);
             dateTextView = itemView.findViewById(R.id.date_text_view);
-            typeTextView = itemView.findViewById(R.id.type_text_view);
+            statusIcon = itemView.findViewById(R.id.status_icon);
         }
     }
 }
