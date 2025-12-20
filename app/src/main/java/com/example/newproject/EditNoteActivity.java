@@ -1,6 +1,5 @@
 package com.example.newproject;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
@@ -10,19 +9,24 @@ import android.view.MenuItem;
 import android.widget.EditText;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.lifecycle.ViewModelProvider;
+
+
 
 public class EditNoteActivity extends AppCompatActivity {
 
     private EditText titleEditText;
     private EditText contentEditText;
+    private NoteViewModel noteViewModel;
     private Note currentNote;
     private boolean isEditMode = false;
-    private int notePosition = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_note);
+
+        noteViewModel = new ViewModelProvider(this).get(NoteViewModel.class);
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -37,7 +41,6 @@ public class EditNoteActivity extends AppCompatActivity {
         if (intent != null && intent.hasExtra("note")) {
             try {
                 currentNote = (Note) intent.getSerializableExtra("note");
-                notePosition = intent.getIntExtra("position", -1);
                 isEditMode = true;
 
                 if (currentNote != null) {
@@ -58,13 +61,6 @@ public class EditNoteActivity extends AppCompatActivity {
             currentNote = new Note("", "");
             if (getSupportActionBar() != null) {
                 getSupportActionBar().setTitle("Новая заметка");
-            }
-        }
-
-        if (isEditMode) {
-            MenuItem deleteItem = toolbar.getMenu().findItem(R.id.action_delete);
-            if (deleteItem != null) {
-                deleteItem.setVisible(true);
             }
         }
 
@@ -90,6 +86,12 @@ public class EditNoteActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_edit_note, menu);
+
+        MenuItem deleteItem = menu.findItem(R.id.action_delete);
+        if (deleteItem != null) {
+            deleteItem.setVisible(isEditMode);
+        }
+
         return true;
     }
 
@@ -129,18 +131,17 @@ public class EditNoteActivity extends AppCompatActivity {
 
         Intent resultIntent = new Intent();
         resultIntent.putExtra("note", currentNote);
-        resultIntent.putExtra("position", notePosition);
         resultIntent.putExtra("isEdit", isEditMode);
 
-        setResult(Activity.RESULT_OK, resultIntent);
+        setResult(RESULT_OK, resultIntent);
         finish();
     }
 
     private void deleteNote() {
         Intent resultIntent = new Intent();
-        resultIntent.putExtra("position", notePosition);
         resultIntent.putExtra("action", "delete");
-        setResult(Activity.RESULT_OK, resultIntent);
+        resultIntent.putExtra("note", currentNote);
+        setResult(RESULT_OK, resultIntent);
         finish();
     }
 
@@ -151,9 +152,8 @@ public class EditNoteActivity extends AppCompatActivity {
         if (!title.isEmpty() || !content.isEmpty()) {
             saveNote();
         } else {
-            setResult(Activity.RESULT_CANCELED);
+            setResult(RESULT_CANCELED);
             finish();
         }
     }
-
 }

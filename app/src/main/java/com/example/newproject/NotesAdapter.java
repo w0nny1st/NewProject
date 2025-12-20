@@ -7,7 +7,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -24,9 +23,18 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         void onNoteLongClick(int position);
     }
 
-    public NotesAdapter(List<Note> notes, OnNoteClickListener listener) {
-        this.notes = notes != null ? notes : new ArrayList<>();
+    public NotesAdapter(OnNoteClickListener listener) {
+        this.notes = new ArrayList<>();
         this.listener = listener;
+    }
+
+    public void setNotes(List<Note> notes) {
+        this.notes = notes != null ? notes : new ArrayList<>();
+        notifyDataSetChanged();
+    }
+
+    public List<Note> getNotes() {
+        return notes;
     }
 
     @NonNull
@@ -65,11 +73,15 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         }
 
         holder.itemView.setOnClickListener(v -> {
-            if (listener != null) listener.onNoteClick(position);
+            if (listener != null) {
+                listener.onNoteClick(position);
+            }
         });
 
         holder.itemView.setOnLongClickListener(v -> {
-            if (listener != null) listener.onNoteLongClick(position);
+            if (listener != null) {
+                listener.onNoteLongClick(position);
+            }
             return true;
         });
     }
@@ -79,25 +91,8 @@ public class NotesAdapter extends RecyclerView.Adapter<NotesAdapter.NoteViewHold
         return notes.size();
     }
 
-    public void updateNotes(List<Note> newNotes) {
-        this.notes = newNotes != null ? newNotes : new ArrayList<>();
-        notifyDataSetChanged();
-    }
-
-    public void addNote(Note note) {
-        notes.add(0, note);
-        notifyItemInserted(0);
-    }
-
-    public void removeNote(int position) {
-        if (position >= 0 && position < notes.size()) {
-            notes.remove(position);
-            notifyItemRemoved(position);
-        }
-    }
-
     static class NoteViewHolder extends RecyclerView.ViewHolder {
-        CardView cardView;
+        androidx.cardview.widget.CardView cardView;
         TextView titleTextView;
         TextView contentTextView;
         TextView dateTextView;

@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -15,6 +16,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -23,15 +26,13 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNoteClickListener {
+    private NoteViewModel noteViewModel;
     private NotificationHelper notificationHelper;
     private RecyclerView recyclerView;
     private NotesAdapter adapter;
-    private List<Note> allNotes;
-    private List<Note> filteredNotes;
     private FloatingActionButton fab;
     private Toolbar toolbar;
     private ChipGroup filterChipGroup;
@@ -44,12 +45,92 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        noteViewModel = new ViewModelProvider(this).get(NoteViewModel.class);
+
         notificationHelper = new NotificationHelper(this);
 
         initViews();
         setupRecyclerView();
-        loadNotesFromPreferences();
+        setupObservers();
         checkNotificationPermission();
+    }
+
+    private void initViews() {
+        recyclerView = findViewById(R.id.recycler_view);
+        fab = findViewById(R.id.fab);
+        toolbar = findViewById(R.id.toolbar);
+
+        filterChipGroup = findViewById(R.id.filter_chip_group);
+        chipAll = findViewById(R.id.chip_all);
+        chipPinned = findViewById(R.id.chip_pinned);
+        chipImportant = findViewById(R.id.chip_important);
+
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Мои Заметки");
+        }
+
+        filterChipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.isEmpty()) {
+                chipAll.setChecked(true);
+            } else {
+                int chipId = checkedIds.get(0);
+                if (chipId == R.id.chip_all) {
+                    noteViewModel.applyFilter("all");
+                } else if (chipId == R.id.chip_pinned) {
+                    noteViewModel.applyFilter("pinned");
+                } else if (chipId == R.id.chip_important) {
+                    noteViewModel.applyFilter("important");
+                }
+            }
+        });
+
+        fab.setOnClickListener(v -> {
+            v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
+                    .withEndAction(() -> {
+                        v.animate().scaleX(1f).scaleY(1f).setDuration(100);
+                        openEditNoteActivity(null);
+                    });
+        });
+    }
+
+    private void setupRecyclerView() {
+        adapter = new NotesAdapter(this);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setAdapter(adapter);
+
+        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(
+                recyclerView.getContext(),
+                DividerItemDecoration.VERTICAL
+        );
+        dividerItemDecoration.setDrawable(ContextCompat.getDrawable(this, R.drawable.divider));
+        recyclerView.addItemDecoration(dividerItemDecoration);
+    }
+
+    private void setupObservers() {
+        noteViewModel.getFilteredNotes().observe(this, new Observer<List<Note>>() {
+            @Override
+            public void onChanged(List<Note> notes) {
+                adapter.setNotes(notes);
+            }
+        });
+
+        noteViewModel.getCurrentFilter().observe(this, new Observer<String>() {
+            @Override
+            public void onChanged(String filter) {
+                switch (filter) {
+                    case "all":
+                        chipAll.setChecked(true);
+                        break;
+                    case "pinned":
+                        chipPinned.setChecked(true);
+                        break;
+                    case "important":
+                        chipImportant.setChecked(true);
+                        break;
+                }
+            }
+        });
     }
 
     private void checkNotificationPermission() {
@@ -98,36 +179,13 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         }
     }
 
-    private void initViews() {
-        recyclerView = findViewById(R.id.recycler_view);
-        fab = findViewById(R.id.fab);
-        toolbar = findViewById(R.id.toolbar);
-
-        filterChipGroup = findViewById(R.id.filter_chip_group);
-        chipAll = findViewById(R.id.chip_all);
-        chipPinned = findViewById(R.id.chip_pinned);
-        chipImportant = findViewById(R.id.chip_important);
-
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Мои Заметки");
+    private void showTestNotification() {
+        if (notificationHelper.areNotificationsEnabled()) {
+            notificationHelper.showSimpleNotification(
+                    "Тестовое уведомление",
+                    "Это тестовое сообщение от приложения Заметки"
+            );
         }
-
-        filterChipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (checkedIds.isEmpty()) {
-                chipAll.setChecked(true);
-            } else {
-                applyFilter(checkedIds.get(0));
-            }
-        });
-
-        fab.setOnClickListener(v -> {
-            v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
-                    .withEndAction(() -> {
-                        v.animate().scaleX(1f).scaleY(1f).setDuration(100);
-                        openEditNoteActivity(null, -1);
-                    });
-        });
     }
 
     @Override
@@ -173,27 +231,16 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         return super.onOptionsItemSelected(item);
     }
 
-    private void showTestNotification() {
-        if (notificationHelper.areNotificationsEnabled()) {
-            notificationHelper.showSimpleNotification(
-                    "Тестовое уведомление",
-                    "Это тестовое сообщение от приложения Заметки"
-            );
-            Toast.makeText(this, "Тестовое уведомление отправлено", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "Уведомления отключены. Включите их в настройках", Toast.LENGTH_LONG).show();
-        }
-    }
-
     private void showReminderDialog() {
-        if (filteredNotes.isEmpty()) {
+        List<Note> notes = adapter.getNotes();
+        if (notes == null || notes.isEmpty()) {
             Toast.makeText(this, "Нет заметок для напоминания", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String[] noteTitles = new String[filteredNotes.size()];
-        for (int i = 0; i < filteredNotes.size(); i++) {
-            noteTitles[i] = filteredNotes.get(i).getTitle();
+        String[] noteTitles = new String[notes.size()];
+        for (int i = 0; i < notes.size(); i++) {
+            noteTitles[i] = notes.get(i).getTitle();
             if (noteTitles[i].length() > 30) {
                 noteTitles[i] = noteTitles[i].substring(0, 30) + "...";
             }
@@ -202,7 +249,7 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         new AlertDialog.Builder(this)
                 .setTitle("Выберите заметку для напоминания")
                 .setItems(noteTitles, (dialog, which) -> {
-                    Note selectedNote = filteredNotes.get(which);
+                    Note selectedNote = notes.get(which);
                     createReminderForNote(selectedNote);
                 })
                 .setNegativeButton("Отмена", null)
@@ -226,110 +273,39 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 .show();
     }
 
-    private void clearAllNotes() {
-        androidx.appcompat.app.AlertDialog.Builder builder =
-                new androidx.appcompat.app.AlertDialog.Builder(this);
-        builder.setTitle("Очистить все заметки")
-                .setMessage("Удалить все заметки?")
-                .setPositiveButton("Удалить", (dialog, which) -> {
-                    allNotes.clear();
-                    filteredNotes.clear();
-                    adapter.updateNotes(filteredNotes);
-                    saveNotesToPreferences();
-                    Toast.makeText(this, "Все заметки удалены", Toast.LENGTH_SHORT).show();
-
-                    if (notificationHelper.areNotificationsEnabled()) {
-                        notificationHelper.showSimpleNotification(
-                                "Все заметки удалены",
-                                "Все заметки были успешно очищены"
-                        );
-                    }
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
-    }
-
-    private void setupRecyclerView() {
-        allNotes = new ArrayList<>();
-        filteredNotes = new ArrayList<>();
-        adapter = new NotesAdapter(filteredNotes, this);
-
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
-
-        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(recyclerView.getContext(),
-                DividerItemDecoration.VERTICAL);
-        dividerItemDecoration.setDrawable(ContextCompat.getDrawable(this, R.drawable.divider));
-        recyclerView.addItemDecoration(dividerItemDecoration);
-    }
-
-    private void applyFilter(int chipId) {
-        filteredNotes.clear();
-
-        if (chipId == R.id.chip_all) {
-            filteredNotes.addAll(allNotes);
-        } else if (chipId == R.id.chip_pinned) {
-            for (Note note : allNotes) {
-                if (note.isPinned()) {
-                    filteredNotes.add(note);
-                }
-            }
-        } else if (chipId == R.id.chip_important) {
-            for (Note note : allNotes) {
-                if (note.getColor() != 0 ||
-                        note.getTitle().toLowerCase().contains("важн") ||
-                        note.getContent().toLowerCase().contains("важн")) {
-                    filteredNotes.add(note);
-                }
-            }
-        }
-
-        adapter.updateNotes(filteredNotes);
-    }
-
-    private void openEditNoteActivity(Note note, int position) {
+    private void openEditNoteActivity(Note note) {
         Intent intent = new Intent(this, EditNoteActivity.class);
         if (note != null) {
             intent.putExtra("note", note);
-            intent.putExtra("position", position);
         }
         startActivityForResult(intent, REQUEST_EDIT_NOTE);
     }
 
     @Override
     public void onNoteClick(int position) {
-        if (position < 0 || position >= filteredNotes.size()) {
-            return;
+        List<Note> notes = adapter.getNotes();
+        if (notes != null && position >= 0 && position < notes.size()) {
+            openEditNoteActivity(notes.get(position));
         }
-
-        Note note = filteredNotes.get(position);
-        int originalPosition = allNotes.indexOf(note);
-        openEditNoteActivity(note, originalPosition);
     }
 
     @Override
     public void onNoteLongClick(int position) {
-        if (position < 0 || position >= filteredNotes.size()) return;
+        List<Note> notes = adapter.getNotes();
+        if (notes != null && position >= 0 && position < notes.size()) {
+            Note note = notes.get(position);
+            note.setPinned(!note.isPinned());
+            noteViewModel.update(note);
 
-        Note note = filteredNotes.get(position);
-        note.setPinned(!note.isPinned());
+            String message = note.isPinned() ? "Закреплено" : "Откреплено";
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
 
-        int originalPosition = allNotes.indexOf(note);
-        if (originalPosition != -1) {
-            allNotes.set(originalPosition, note);
-        }
-
-        applyFilter(filterChipGroup.getCheckedChipId());
-        saveNotesToPreferences();
-
-        String message = note.isPinned() ? "Закреплено" : "Откреплено";
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-
-        if (notificationHelper.areNotificationsEnabled() && note.isPinned()) {
-            notificationHelper.showSimpleNotification(
-                    "Заметка закреплена",
-                    "Заметка \"" + note.getTitle() + "\" закреплена вверху списка"
-            );
+            if (notificationHelper.areNotificationsEnabled() && note.isPinned()) {
+                notificationHelper.showSimpleNotification(
+                        "Заметка закреплена",
+                        "Заметка \"" + note.getTitle() + "\" закреплена вверху списка"
+                );
+            }
         }
     }
 
@@ -341,12 +317,9 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
             String action = data.getStringExtra("action");
 
             if ("delete".equals(action)) {
-                int position = data.getIntExtra("position", -1);
-                if (position != -1 && position < allNotes.size()) {
-                    Note deletedNote = allNotes.get(position);
-                    allNotes.remove(position);
-                    applyFilter(filterChipGroup.getCheckedChipId());
-                    saveNotesToPreferences();
+                Note deletedNote = (Note) data.getSerializableExtra("note");
+                if (deletedNote != null) {
+                    noteViewModel.delete(deletedNote);
                     Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show();
 
                     if (notificationHelper.areNotificationsEnabled()) {
@@ -362,114 +335,42 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
             Note updatedNote = (Note) data.getSerializableExtra("note");
             if (updatedNote == null) return;
 
-            int position = data.getIntExtra("position", -1);
             boolean isEdit = data.getBooleanExtra("isEdit", false);
 
-            if (isEdit && position != -1 && position < allNotes.size()) {
-                allNotes.set(position, updatedNote);
+            if (isEdit) {
+                noteViewModel.update(updatedNote);
+                Toast.makeText(this, "Сохранено", Toast.LENGTH_SHORT).show();
             } else {
-                allNotes.add(0, updatedNote);
-            }
+                noteViewModel.insert(updatedNote);
+                Toast.makeText(this, "Добавлено", Toast.LENGTH_SHORT).show();
 
-            applyFilter(filterChipGroup.getCheckedChipId());
-            saveNotesToPreferences();
-            recyclerView.smoothScrollToPosition(0);
-
-            String message = isEdit ? "Сохранено" : "Добавлено";
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-
-            if (notificationHelper.areNotificationsEnabled() && !isEdit) {
-                notificationHelper.showSimpleNotification(
-                        "Новая заметка",
-                        "Заметка \"" + updatedNote.getTitle() + "\" добавлена"
-                );
-            }
-        }
-    }
-
-    private void saveNotesToPreferences() {
-        android.content.SharedPreferences prefs = getSharedPreferences("notes_prefs", MODE_PRIVATE);
-        android.content.SharedPreferences.Editor editor = prefs.edit();
-
-        editor.putInt("notes_count", allNotes.size());
-
-        for (int i = 0; i < allNotes.size(); i++) {
-            Note note = allNotes.get(i);
-            String noteJson = convertNoteToJson(note);
-            editor.putString("note_" + i, noteJson);
-        }
-
-        editor.apply();
-    }
-
-    private void loadNotesFromPreferences() {
-        android.content.SharedPreferences prefs = getSharedPreferences("notes_prefs", MODE_PRIVATE);
-        int notesCount = prefs.getInt("notes_count", 0);
-
-        allNotes.clear();
-
-        if (notesCount == 0) {
-            loadSampleData();
-        } else {
-            for (int i = 0; i < notesCount; i++) {
-                String noteJson = prefs.getString("note_" + i, "");
-                if (!noteJson.isEmpty()) {
-                    Note note = convertJsonToNote(noteJson);
-                    if (note != null) {
-                        allNotes.add(note);
-                    }
+                if (notificationHelper.areNotificationsEnabled()) {
+                    notificationHelper.showSimpleNotification(
+                            "Новая заметка",
+                            "Заметка \"" + updatedNote.getTitle() + "\" добавлена"
+                    );
                 }
             }
         }
-
-        applyFilter(R.id.chip_all);
     }
 
-    private String convertNoteToJson(Note note) {
-        try {
-            org.json.JSONObject json = new org.json.JSONObject();
-            json.put("id", note.getId());
-            json.put("title", note.getTitle());
-            json.put("content", note.getContent());
-            json.put("timestamp", note.getTimestamp());
-            json.put("isPinned", note.isPinned());
-            json.put("color", note.getColor());
-            return json.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "";
-        }
+    private void clearAllNotes() {
+        new AlertDialog.Builder(this)
+                .setTitle("Очистить все заметки")
+                .setMessage("Удалить все заметки?")
+                .setPositiveButton("Удалить", (dialog, which) -> {
+                    noteViewModel.deleteAllNotes();
+                    Toast.makeText(this, "Все заметки удалены", Toast.LENGTH_SHORT).show();
+
+                    if (notificationHelper.areNotificationsEnabled()) {
+                        notificationHelper.showSimpleNotification(
+                                "Все заметки удалены",
+                                "Все заметки были успешно очищены"
+                        );
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
-    private Note convertJsonToNote(String jsonString) {
-        try {
-            org.json.JSONObject json = new org.json.JSONObject(jsonString);
-            Note note = new Note(json.getString("title"), json.getString("content"));
-            note.setId(json.getString("id"));
-            note.setTimestamp(json.getLong("timestamp"));
-            note.setPinned(json.getBoolean("isPinned"));
-            note.setColor(json.getInt("color"));
-            return note;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private void loadSampleData() {
-        allNotes.add(new Note("Добро пожаловать", "Это приложение для заметок"));
-        allNotes.add(new Note("Список покупок", "Молоко, Хлеб, Яйца, Фрукты"));
-        allNotes.add(new Note("Задачи на день", "1. Сделать проект\n2. Погулять\n3. Отдохнуть"));
-        allNotes.add(new Note("Важная встреча", "Не забыть про встречу с клиентом в 15:00"));
-
-        Note pinnedNote = new Note("Важная заметка", "Не забыть сдать проект до пятницы!");
-        pinnedNote.setPinned(true);
-        allNotes.add(pinnedNote);
-
-        Note importantNote = new Note("Идеи для проекта", "1. Material Design\n2. SplashScreen\n3. Фильтрация");
-        importantNote.setColor(0xFFFFEB3B);
-        allNotes.add(importantNote);
-
-        saveNotesToPreferences();
-    }
 }
