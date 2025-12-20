@@ -1,24 +1,33 @@
 package com.example.newproject;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNoteClickListener {
-
+    private NotificationHelper notificationHelper;
     private RecyclerView recyclerView;
     private NotesAdapter adapter;
     private List<Note> allNotes;
@@ -28,15 +37,65 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
     private ChipGroup filterChipGroup;
     private Chip chipAll, chipPinned, chipImportant;
     private static final int REQUEST_EDIT_NOTE = 1;
+    private static final int REQUEST_NOTIFICATION_PERMISSION = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        notificationHelper = new NotificationHelper(this);
+
         initViews();
         setupRecyclerView();
         loadNotesFromPreferences();
+        checkNotificationPermission();
+    }
+
+    private void checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+
+                if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                    showPermissionRationaleDialog();
+                } else {
+                    requestNotificationPermission();
+                }
+            }
+        }
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_NOTIFICATION_PERMISSION);
+        }
+    }
+
+    private void showPermissionRationaleDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Разрешение на уведомления")
+                .setMessage("Для отправки напоминаний о заметках необходимо разрешение на уведомления")
+                .setPositiveButton("Разрешить", (dialog, which) -> requestNotificationPermission())
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Уведомления разрешены", Toast.LENGTH_SHORT).show();
+                showTestNotification();
+            } else {
+                Toast.makeText(this, "Уведомления запрещены", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private void initViews() {
@@ -56,7 +115,6 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
 
         filterChipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty()) {
-
                 chipAll.setChecked(true);
             } else {
                 applyFilter(checkedIds.get(0));
@@ -75,6 +133,19 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main_simple, menu);
+
+        MenuItem testNotificationItem = menu.add(0, 999, 0, "Тест уведомления");
+        testNotificationItem.setIcon(R.drawable.ic_alarm);
+        testNotificationItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+
+        MenuItem notificationSettingsItem = menu.add(0, 1000, 0, "Настройки уведомлений");
+        notificationSettingsItem.setIcon(android.R.drawable.ic_menu_preferences);
+        notificationSettingsItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
+        MenuItem reminderItem = menu.add(0, 1001, 0, "Создать напоминание");
+        reminderItem.setIcon(R.drawable.ic_pin);
+        reminderItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+
         return true;
     }
 
@@ -88,9 +159,71 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         } else if (id == R.id.menu_about) {
             Toast.makeText(this, "Приложение Заметки v1.0", Toast.LENGTH_SHORT).show();
             return true;
+        } else if (id == 999) {
+            showTestNotification();
+            return true;
+        } else if (id == 1000) {
+            notificationHelper.openNotificationSettings();
+            return true;
+        } else if (id == 1001) {
+            showReminderDialog();
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showTestNotification() {
+        if (notificationHelper.areNotificationsEnabled()) {
+            notificationHelper.showSimpleNotification(
+                    "Тестовое уведомление",
+                    "Это тестовое сообщение от приложения Заметки"
+            );
+            Toast.makeText(this, "Тестовое уведомление отправлено", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Уведомления отключены. Включите их в настройках", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showReminderDialog() {
+        if (filteredNotes.isEmpty()) {
+            Toast.makeText(this, "Нет заметок для напоминания", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] noteTitles = new String[filteredNotes.size()];
+        for (int i = 0; i < filteredNotes.size(); i++) {
+            noteTitles[i] = filteredNotes.get(i).getTitle();
+            if (noteTitles[i].length() > 30) {
+                noteTitles[i] = noteTitles[i].substring(0, 30) + "...";
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Выберите заметку для напоминания")
+                .setItems(noteTitles, (dialog, which) -> {
+                    Note selectedNote = filteredNotes.get(which);
+                    createReminderForNote(selectedNote);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void createReminderForNote(Note note) {
+        String[] reminderTimes = {"Через 5 минут", "Через 30 минут", "Через 1 час", "Через 3 часа", "Завтра утром"};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Когда напомнить?")
+                .setItems(reminderTimes, (dialog, which) -> {
+                    if (notificationHelper.areNotificationsEnabled()) {
+                        notificationHelper.showNoteReminder(note);
+                        Toast.makeText(this, "Напоминание создано для заметки: " + note.getTitle(), Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "Включите уведомления в настройках", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void clearAllNotes() {
@@ -104,6 +237,13 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                     adapter.updateNotes(filteredNotes);
                     saveNotesToPreferences();
                     Toast.makeText(this, "Все заметки удалены", Toast.LENGTH_SHORT).show();
+
+                    if (notificationHelper.areNotificationsEnabled()) {
+                        notificationHelper.showSimpleNotification(
+                                "Все заметки удалены",
+                                "Все заметки были успешно очищены"
+                        );
+                    }
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
@@ -123,7 +263,6 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         recyclerView.addItemDecoration(dividerItemDecoration);
     }
 
-
     private void applyFilter(int chipId) {
         filteredNotes.clear();
 
@@ -136,7 +275,6 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
                 }
             }
         } else if (chipId == R.id.chip_important) {
-
             for (Note note : allNotes) {
                 if (note.getColor() != 0 ||
                         note.getTitle().toLowerCase().contains("важн") ||
@@ -165,7 +303,6 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
         }
 
         Note note = filteredNotes.get(position);
-
         int originalPosition = allNotes.indexOf(note);
         openEditNoteActivity(note, originalPosition);
     }
@@ -187,6 +324,13 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
 
         String message = note.isPinned() ? "Закреплено" : "Откреплено";
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+
+        if (notificationHelper.areNotificationsEnabled() && note.isPinned()) {
+            notificationHelper.showSimpleNotification(
+                    "Заметка закреплена",
+                    "Заметка \"" + note.getTitle() + "\" закреплена вверху списка"
+            );
+        }
     }
 
     @Override
@@ -199,10 +343,18 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
             if ("delete".equals(action)) {
                 int position = data.getIntExtra("position", -1);
                 if (position != -1 && position < allNotes.size()) {
+                    Note deletedNote = allNotes.get(position);
                     allNotes.remove(position);
                     applyFilter(filterChipGroup.getCheckedChipId());
                     saveNotesToPreferences();
                     Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show();
+
+                    if (notificationHelper.areNotificationsEnabled()) {
+                        notificationHelper.showSimpleNotification(
+                                "Заметка удалена",
+                                "Заметка \"" + deletedNote.getTitle() + "\" удалена"
+                        );
+                    }
                 }
                 return;
             }
@@ -225,6 +377,13 @@ public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNo
 
             String message = isEdit ? "Сохранено" : "Добавлено";
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+
+            if (notificationHelper.areNotificationsEnabled() && !isEdit) {
+                notificationHelper.showSimpleNotification(
+                        "Новая заметка",
+                        "Заметка \"" + updatedNote.getTitle() + "\" добавлена"
+                );
+            }
         }
     }
 

@@ -9,6 +9,13 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/menu_reminders"
+        android:title="Напоминания"
+        android:icon="@drawable/ic_alarm"
+        app:showAsAction="ifRoom" />
+
+
+    <item
         android:id="@+id/menu_about"
         android:title="О приложении"
         app:showAsAction="never" />

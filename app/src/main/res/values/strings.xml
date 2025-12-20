@@ -13,4 +13,16 @@
     <string name="note_deleted">Заметка удалена</string>
     <string name="note_pinned">Заметка закреплена</string>
     <string name="note_unpinned">Заметка откреплена</string>
+    <string name="default_notification_channel_id">notes_channel</string>
+    <string name="notification_channel_name">Заметки</string>
+    <string name="notification_channel_description">Уведомления о заметках</string>
+    <string name="notification_title">Напоминание о заметке</string>
+    <string name="notification_message">Не забудьте про: %s</string>
+    <string name="notification_open">Открыть</string>
+    <string name="notification_delete">Удалить</string>
+    <string name="notification_remind_later">Напомнить позже</string>
+    <string name="notification_permission_title">Разрешение на уведомления</string>
+    <string name="notification_permission_message">Для отправки напоминаний о заметках необходимо разрешение на уведомления</string>
+    <string name="notification_settings">Настройки</string>
+    <string name="notification_cancel">Отмена</string>
 </resources>
